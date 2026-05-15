@@ -16,20 +16,18 @@ GREEN='\033[1;32m'; YELLOW='\033[1;33m'; CYAN='\033[1;36m'; NC='\033[0m'
 echo -e "${CYAN}[1/5] Clonando kernel ${KERNEL_TAG}...${NC}"
 if [ ! -d "$KERNEL_SRC" ]; then
   git clone --depth 1 --branch "$KERNEL_TAG" https://github.com/torvalds/linux.git "$KERNEL_SRC"
-else
-  echo -e "${YELLOW}  → Fuentes ya presentes, omitiendo clone.${NC}"
 fi
 
 cd "$KERNEL_SRC"
-echo -e "${CYAN}[2/5] Guardando hash del commit vulnerable...${NC}"
+echo -e "${CYAN}[2/5] Guardando hash del commit...${NC}"
 VULN_HASH=$(git rev-parse HEAD)
 mkdir -p "$WORKSPACE_ROOT/kernel"
 echo "$VULN_HASH" > "$WORKSPACE_ROOT/kernel/vuln_commit.txt"
 
-echo -e "${CYAN}[3/5] Configurando el kernel (tiny + algif_aead)...${NC}"
+echo -e "${CYAN}[3/5] Configurando el kernel (tinyconfig)...${NC}"
 make tinyconfig
 
-# Habilitar opciones críticas de bajo nivel para QEMU y evitar el Kernel Panic
+# Habilitar opciones indispensables para QEMU
 scripts/config --enable 64BIT
 scripts/config --enable SERIAL_8250
 scripts/config --enable SERIAL_8250_CONSOLE
@@ -41,7 +39,7 @@ scripts/config --enable NET
 scripts/config --enable UNIX
 scripts/config --enable INET
 
-# Componentes de la superficie expuesta (algif_aead)
+# Módulos Crypto vulnerables (AF_ALG)
 scripts/config --enable CRYPTO
 scripts/config --enable CRYPTO_USER_API
 scripts/config --enable CRYPTO_USER_API_AEAD

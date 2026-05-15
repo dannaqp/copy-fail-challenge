@@ -84,3 +84,10 @@ copy-fail-challenge/
 
 Hola commit uno, tratando de resolver el kernel panic
 Hi, commit 2
+
+Hito 1:
+![alt text](image.png)
+
+El kernel panic se daba ya que el kernel no podia ver el archivo /init al cambiar los scripts 02 y 01 se logro resolver el error -2 de kernel panic y entrar a la interfaz del qemu 
+
+Commit 3: Ya se resolvio el kernel panic y qemu corre perfectamente

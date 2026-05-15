@@ -17,7 +17,7 @@ if [ ! -d "$BUSYBOX_SRC" ]; then
 fi
 
 cd "$BUSYBOX_SRC"
-echo -e "${CYAN}[2/6] Configurando BusyBox...${NC}"
+echo -e "${CYAN}[2/6] Configurando BusyBox (estático)...${NC}"
 make defconfig
 sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/' .config
 grep -q "CONFIG_STATIC=y" .config || echo "CONFIG_STATIC=y" >> .config
@@ -30,26 +30,29 @@ echo -e "${CYAN}[4/6] Instalando BusyBox...${NC}"
 mkdir -p "$INITRAMFS_DIR"
 make CONFIG_PREFIX="$INITRAMFS_DIR" install
 
-mkdir -p "$INITRAMFS_DIR"/{proc,sys,dev,tmp,etc,root,home/student,usr/bin,run}
+# Estructura del sistema
+mkdir -p "$INITRAMFS_DIR"/{proc,sys,dev,tmp,etc,root,home/student,usr/bin,lib,lib64,run}
 
-echo -e "${CYAN}[5/6] Copiando Python 3 y librerías dinámicas del Host...${NC}"
+echo -e "${CYAN}[5/6] Incluyendo Python 3 (Arreglando dependencias y enlaces)...${NC}"
 PYTHON_BIN=$(which python3)
 cp "$PYTHON_BIN" "$INITRAMFS_DIR/usr/bin/python3"
 
-# Mapear las librerías dinámicas compartidas de forma exacta
+# FIX: Forzar la copia del cargador dinámico real para resolver el Error -2
+cp -LH /lib64/ld-linux-x86-64.so.2 "$INITRAMFS_DIR/lib64/" 2>/dev/null || true
+
+# Copiar librerías siguiendo enlaces reales (-LH)
 for lib in $(ldd "$PYTHON_BIN" 2>/dev/null | grep -oE '/[^ ]+\.so[^ ]*'); do
   mkdir -p "$INITRAMFS_DIR$(dirname $lib)"
-  cp -L "$lib" "$INITRAMFS_DIR$lib" 2>/dev/null || true
+  cp -LH "$lib" "$INITRAMFS_DIR$lib" 2>/dev/null || true
 done
 
-# Cargar la librería estándar nativa para habilitar os.splice()
 PYTHON_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
 mkdir -p "$INITRAMFS_DIR/usr/lib/python${PYTHON_VER}"
 cp -r /usr/lib/python3/* "$INITRAMFS_DIR/usr/lib/" 2>/dev/null || \
   cp -r /usr/lib/python${PYTHON_VER} "$INITRAMFS_DIR/usr/lib/" 2>/dev/null || true
 ln -sf python3 "$INITRAMFS_DIR/usr/bin/python" 2>/dev/null || true
 
-# Configuración de cuentas y entorno local
+# Cuentas de usuario indispensables
 cat > "$INITRAMFS_DIR/etc/passwd" << 'EOF'
 root:x:0:0:root:/root:/bin/sh
 student:x:1001:1001:student:/home/student:/bin/sh
@@ -80,7 +83,7 @@ exec su - student
 INITEOF
 chmod +x "$INITRAMFS_DIR/init"
 
-echo -e "${CYAN}[6/6] Empaquetando initramfs de forma nativa...${NC}"
+echo -e "${CYAN}[6/6] Empaquetando...${NC}"
 cd "$INITRAMFS_DIR"
 find . | cpio -o -H newc | gzip > "$BUILD_DIR/initramfs.cpio.gz"
-echo -e "${GREEN}✓ rootfs generado de forma limpia.${NC}"
+echo -e "${GREEN}✓ rootfs generado sin errores.${NC}"
