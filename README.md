@@ -127,4 +127,6 @@ Y por ultimo verifique que mi exploit en c ya no funciona para hacerme root
 
 ![Parchado](<Screenshot 2026-05-15 125035.png>)
 
+# RELACION DE CONCEPTOS
 
+Al finalizar este challenge entendi el como se puede hacer uso de vacios legales para modificar usuarios y sus permisos inyectados en codigo malicioso, el cual logra ejecutar acciones que solamente un usuario root podria pero lo hace utilizando en este caso el fallo de copy fail ya que al estar como student (1001) se supone que no se puede escalar asi de usuario pero usando el exploit en c (en mi caso) que define el user id como 0 y el group id tambien como 0 y como esta ubicado en la carpeta bin, se usa como comando el cual tiene permisos de ejecucion para cualquiera y este transforma al id del que lo use en 0 para asi poder tener control total como root, para parcharlo temporalmente utilice un chmod para cambiar los permisos pero todo dentro del qemu por lo que era un parche temporal asi que para parcharlo permanentemente lo que hice fue modificar de vuelta el codigo de 02_build_rootfs.sh y esto empaquetarlo para que el SO corra ya sin opcion a utilizar el exploit siempre que se construya, al entrar a qemu en cualquier rato con esto ya parchado se logra ver que ya no funciona el exploit en c y esta finalmente parchado para ese fallo. 
