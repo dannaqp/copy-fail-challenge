@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # scripts/02_build_rootfs.sh
+# Construye el initramfs de la prueba + Inyección del Exploit en C del ejercicio
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -30,17 +31,17 @@ echo -e "${CYAN}[4/6] Instalando BusyBox...${NC}"
 mkdir -p "$INITRAMFS_DIR"
 make CONFIG_PREFIX="$INITRAMFS_DIR" install
 
-# Estructura del sistema
+# Estructura del sistema jerárquico UNIX
 mkdir -p "$INITRAMFS_DIR"/{proc,sys,dev,tmp,etc,root,home/student,usr/bin,lib,lib64,run}
 
-echo -e "${CYAN}[5/6] Incluyendo Python 3 (Arreglando dependencias y enlaces)...${NC}"
+echo -e "${CYAN}[5/6] Incluyendo Python 3 y arreglando enlazadores...${NC}"
 PYTHON_BIN=$(which python3)
 cp "$PYTHON_BIN" "$INITRAMFS_DIR/usr/bin/python3"
 
-# FIX: Forzar la copia del cargador dinámico real para resolver el Error -2
+# Copia del cargador dinámico real para asegurar que no dé Error -2
 cp -LH /lib64/ld-linux-x86-64.so.2 "$INITRAMFS_DIR/lib64/" 2>/dev/null || true
 
-# Copiar librerías siguiendo enlaces reales (-LH)
+# Copiar librerías dinámicas rompiendo enlaces simbólicos rotos (-LH)
 for lib in $(ldd "$PYTHON_BIN" 2>/dev/null | grep -oE '/[^ ]+\.so[^ ]*'); do
   mkdir -p "$INITRAMFS_DIR$(dirname $lib)"
   cp -LH "$lib" "$INITRAMFS_DIR$lib" 2>/dev/null || true
@@ -52,7 +53,7 @@ cp -r /usr/lib/python3/* "$INITRAMFS_DIR/usr/lib/" 2>/dev/null || \
   cp -r /usr/lib/python${PYTHON_VER} "$INITRAMFS_DIR/usr/lib/" 2>/dev/null || true
 ln -sf python3 "$INITRAMFS_DIR/usr/bin/python" 2>/dev/null || true
 
-# Cuentas de usuario indispensables
+# Configuración de usuarios locales
 cat > "$INITRAMFS_DIR/etc/passwd" << 'EOF'
 root:x:0:0:root:/root:/bin/sh
 student:x:1001:1001:student:/home/student:/bin/sh
@@ -68,7 +69,7 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export PS1='[\u@copy-fail \w]\$ '
 EOF
 
-# Script init maestro
+# Script init de arranque de la máquina virtual
 cat > "$INITRAMFS_DIR/init" << 'INITEOF'
 #!/bin/sh
 mount -t proc none /proc
@@ -83,7 +84,22 @@ exec su - student
 INITEOF
 chmod +x "$INITRAMFS_DIR/init"
 
+# =================================================================
+# INTEGRACIÓN DEL RETO: INYECCIÓN DEL EXPLOIT EN C CON BIT SUID
+# =================================================================
+if [ -f "$WORKSPACE_ROOT/exploit" ]; then
+    echo -e "${GREEN} -> Inyectando binario estático real en el rootfs...${NC}"
+    cp "$WORKSPACE_ROOT/exploit" "$INITRAMFS_DIR/home/student/exploit"
+    
+    # Asignar Root como dueño y establecer privilegios SUID (4755)
+    chown 0:0 "$INITRAMFS_DIR/home/student/exploit"
+    chmod 4755 "$INITRAMFS_DIR/home/student/exploit"
+else
+    echo -e "${YELLOW} ⚠ ALERTA: No se encontró el binario '$WORKSPACE_ROOT/exploit'. Asegúrate de compilarlo en la raíz primero.${NC}"
+fi
+# =================================================================
+
 echo -e "${CYAN}[6/6] Empaquetando...${NC}"
 cd "$INITRAMFS_DIR"
 find . | cpio -o -H newc | gzip > "$BUILD_DIR/initramfs.cpio.gz"
-echo -e "${GREEN}✓ rootfs generado sin errores.${NC}"
+echo -e "${GREEN}✓ rootfs con exploit en C inyectado sin Kernel Panic.${NC}"

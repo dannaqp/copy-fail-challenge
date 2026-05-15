@@ -93,3 +93,7 @@ El kernel panic se daba ya que el kernel no podia ver el archivo /init al cambia
 Commit 3: Ya se resolvio el kernel panic y qemu corre perfectamente
 
 ![Prueba hito 1](image-2.png) 
+
+A diferencia de lo que se hizo con el exploit de python yo utilice un exploit en c que establece el id como 0, mi resolucion para poder ser root se podria resumir como que iyectamos al exploit en c para que este en bin estatico en la construccion de la vm de ubuntu y al ejecutar este exploit usando codigo en c define el id como 0, dando permisos de root
+
+![alt text](image-3.png)
