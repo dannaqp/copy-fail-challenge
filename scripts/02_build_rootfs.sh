@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # scripts/02_build_rootfs.sh
-# Construye el initramfs con BusyBox + Python 3 + Enlazador Dinámico Corregido
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,46 +17,39 @@ if [ ! -d "$BUSYBOX_SRC" ]; then
 fi
 
 cd "$BUSYBOX_SRC"
-echo -e "${CYAN}[2/6] Configurando BusyBox (binario estático)...${NC}"
+echo -e "${CYAN}[2/6] Configurando BusyBox...${NC}"
 make defconfig
-
 sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/' .config
 grep -q "CONFIG_STATIC=y" .config || echo "CONFIG_STATIC=y" >> .config
-sed -i 's/CONFIG_TC=y/CONFIG_TC=n/' .config
+sed -i 's/CONFIG_TC=y/CONFIG_TC=n/' .config   
 
 echo -e "${CYAN}[3/6] Compilando BusyBox...${NC}"
 make -j"$JOBS" 2>&1 | tail -3
 
-echo -e "${CYAN}[4/6] Instalando BusyBox en el initramfs...${NC}"
+echo -e "${CYAN}[4/6] Instalando BusyBox...${NC}"
 mkdir -p "$INITRAMFS_DIR"
 make CONFIG_PREFIX="$INITRAMFS_DIR" install
 
-# Estructura de directorios UNIX real
-mkdir -p "$INITRAMFS_DIR"/{proc,sys,dev,tmp,etc,root,home/student,usr/bin,usr/lib,lib,lib64,run}
+mkdir -p "$INITRAMFS_DIR"/{proc,sys,dev,tmp,etc,root,home/student,usr/bin,run}
 
-# ── [CRÍTICO] INCLUSIÓN DE PYTHON + CARGADOR DINÁMICO COMPLETOS ─────────────────
-echo -e "${CYAN}[5/6] Copiando Python y solucionando dependencias de librerías...${NC}"
+echo -e "${CYAN}[5/6] Copiando Python 3 y librerías dinámicas del Host...${NC}"
 PYTHON_BIN=$(which python3)
 cp "$PYTHON_BIN" "$INITRAMFS_DIR/usr/bin/python3"
-ln -sf python3 "$INITRAMFS_DIR/usr/bin/python"
 
-# Solución al Error -2: Copiar el enlazador dinámico real del host a la raíz del QEMU
-cp -L /lib64/ld-linux-x86-64.so.2 "$INITRAMFS_DIR/lib64/" 2>/dev/null || true
-cp -L /lib/ld-linux-x86-64.so.2 "$INITRAMFS_DIR/lib/" 2>/dev/null || true
-
-# Copiar todas las librerías compartidas detectadas por ldd
+# Mapear las librerías dinámicas compartidas de forma exacta
 for lib in $(ldd "$PYTHON_BIN" 2>/dev/null | grep -oE '/[^ ]+\.so[^ ]*'); do
-  mkdir -p "$INITRAMFS_DIR$(dirname "$lib")"
+  mkdir -p "$INITRAMFS_DIR$(dirname $lib)"
   cp -L "$lib" "$INITRAMFS_DIR$lib" 2>/dev/null || true
 done
 
-# Copiar la librería estándar mínima de Python para que os.splice funcione
+# Cargar la librería estándar nativa para habilitar os.splice()
 PYTHON_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
 mkdir -p "$INITRAMFS_DIR/usr/lib/python${PYTHON_VER}"
-cp -r /usr/lib/python3/* "$INITRAMFS_DIR/usr/lib/python${PYTHON_VER}/" 2>/dev/null || true
-# ────────────────────────────────────────────────────────────────────────────────
+cp -r /usr/lib/python3/* "$INITRAMFS_DIR/usr/lib/" 2>/dev/null || \
+  cp -r /usr/lib/python${PYTHON_VER} "$INITRAMFS_DIR/usr/lib/" 2>/dev/null || true
+ln -sf python3 "$INITRAMFS_DIR/usr/bin/python" 2>/dev/null || true
 
-# Estructura de usuarios
+# Configuración de cuentas y entorno local
 cat > "$INITRAMFS_DIR/etc/passwd" << 'EOF'
 root:x:0:0:root:/root:/bin/sh
 student:x:1001:1001:student:/home/student:/bin/sh
@@ -71,14 +63,9 @@ EOF
 cat > "$INITRAMFS_DIR/etc/profile" << 'EOF'
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export PS1='[\u@copy-fail \w]\$ '
-echo ""
-echo "  Bienvenido al kernel vulnerable (CVE-2026-31431)"
-echo "  Usuario: $(id)"
-echo "  Kernel:  $(uname -r)"
-echo ""
 EOF
 
-# Creación limpia del ejecutable /init interpretado por BINFMT_SCRIPT
+# Script init maestro
 cat > "$INITRAMFS_DIR/init" << 'INITEOF'
 #!/bin/sh
 mount -t proc none /proc
@@ -86,28 +73,14 @@ mount -t sysfs none /sys
 mount -t devtmpfs none /dev 2>/dev/null || mdev -s
 mount -t tmpfs none /tmp
 
-# Forzar la carga de los módulos vulnerables del reto
 modprobe algif_aead 2>/dev/null || true
 modprobe authencesn 2>/dev/null || true
 
-STUDENT_ID="${STUDENT_ID:-unknown}"
-hostname "copy-fail-${STUDENT_ID}"
-
-echo ""
-echo "  ╔══════════════════════════════════════════╗"
-echo "  ║   KERNEL VULNERABLE — CVE-2026-31431     ║"
-echo "  ║   Evaluación Práctica de UNIX            ║"
-echo "  ╚══════════════════════════════════════════╝"
-echo ""
-
-# Lanzar el entorno degradando privilegios a student obligatoriamente para calificar
 exec su - student
 INITEOF
-
 chmod +x "$INITRAMFS_DIR/init"
 
-echo -e "${CYAN}[6/6] Empaquetando initramfs...${NC}"
+echo -e "${CYAN}[6/6] Empaquetando initramfs de forma nativa...${NC}"
 cd "$INITRAMFS_DIR"
-find . | cpio -o -H newc 2>/dev/null | gzip > "$BUILD_DIR/initramfs.cpio.gz"
-
-echo -e "${GREEN}✓ rootfs listo y parchado sin Kernel Panic!${NC}"
+find . | cpio -o -H newc | gzip > "$BUILD_DIR/initramfs.cpio.gz"
+echo -e "${GREEN}✓ rootfs generado de forma limpia.${NC}"
