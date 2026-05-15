@@ -96,4 +96,9 @@ Commit 3: Ya se resolvio el kernel panic y qemu corre perfectamente
 
 A diferencia de lo que se hizo con el exploit de python yo utilice un exploit en c que establece el id como 0, mi resolucion para poder ser root se podria resumir como que iyectamos al exploit en c para que este en bin estatico en la construccion de la vm de ubuntu y al ejecutar este exploit usando codigo en c define el id como 0, dando permisos de root
 
-![alt text](image-3.png)
+![Prueba Hito 2](image-3.png)
+
+# HITO 3
+
+Ya que mi exploit es diferente lo que hice fue hacer un cambio de permisos del exploit con chmod y despues lo que hice fue deshabilitar los namespaces de usuario para romper el aislamiento del espacio de usuario con el segundo comando utilizando echo 0 direccionando esto con > asi, cambie de user a student otra vez para comprobar que el exploit ex invalido completamente y como se puede ver ya no funciona ya que sigo como student 
+![Prueba Hito 3](<Screenshot 2026-05-15 120927.png>)    
