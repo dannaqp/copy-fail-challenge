@@ -109,3 +109,22 @@ A diferencia de lo que se hizo con el exploit de python yo utilice un exploit en
 Ya que mi exploit es diferente lo que hice fue hacer un cambio de permisos del exploit con chmod y despues lo que hice fue deshabilitar los namespaces de usuario para romper el aislamiento del espacio de usuario con el segundo comando utilizando echo 0 direccionando esto con > asi, cambie de user a student otra vez para comprobar que el exploit ex invalido completamente y como se puede ver ya no funciona ya que sigo como student 
 ![Prueba Hito 3](<Screenshot 2026-05-15 120927.png>)   
 
+# HITO 4
+
+En primera instancia se creo el archivo parche fix_algif_aead.patch 
+
+![Archivo parche](<Screenshot 2026-05-15 123329-1.png>)
+
+Despues se modifico lo que cambie en el script 02 que otorgaba id 0 (ahora 1001) y permisos 4755 (ahora 0755) y se empaqueto todo con el cambio usando bash con el archivo modificado que en este caso fue 02, pero antes ya se utilizo al modificar el codigo del kernel para evitar el kernel panic
+
+![bash command](image-4.png)
+
+Y despues hacemos el make qemu con los cambios aplicados 
+
+![entrando a qemu con el parche](image-5.png)
+
+Y por ultimo verifique que mi exploit en c ya no funciona para hacerme root
+
+![Parchado](<Screenshot 2026-05-15 125035.png>)
+
+

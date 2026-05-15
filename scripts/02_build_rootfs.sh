@@ -91,9 +91,9 @@ if [ -f "$WORKSPACE_ROOT/exploit" ]; then
     echo -e "${GREEN} -> Inyectando binario estático real en el rootfs...${NC}"
     cp "$WORKSPACE_ROOT/exploit" "$INITRAMFS_DIR/home/student/exploit"
     
-    # Asignar Root como dueño y establecer privilegios SUID (4755)
-    chown 0:0 "$INITRAMFS_DIR/home/student/exploit"
-    chmod 4755 "$INITRAMFS_DIR/home/student/exploit"
+    # Asignar Root como dueño y establecer privilegios SUID (4755) Ahora cambiamos esto para quitar los permisos del exploit id 0 a 1001 y de 4755 a 0755
+    chown 1001:1001 "$INITRAMFS_DIR/home/student/exploit"
+    chmod 0755 "$INITRAMFS_DIR/home/student/exploit"
 else
     echo -e "${YELLOW} ⚠ ALERTA: No se encontró el binario '$WORKSPACE_ROOT/exploit'. Asegúrate de compilarlo en la raíz primero.${NC}"
 fi
@@ -102,4 +102,4 @@ fi
 echo -e "${CYAN}[6/6] Empaquetando...${NC}"
 cd "$INITRAMFS_DIR"
 find . | cpio -o -H newc | gzip > "$BUILD_DIR/initramfs.cpio.gz"
-echo -e "${GREEN}✓ rootfs con exploit en C inyectado sin Kernel Panic.${NC}"
+echo -e "${GREEN}✓ rootfs con exploit en C (ya no valido) inyectado sin Kernel Panic.${NC}"
